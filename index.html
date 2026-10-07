@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crea tu Villano</title>
+<!--
+=====================================================================
+  😈 CREA TU VILLANO — GUÍA RÁPIDA PARA EDITAR
+=====================================================================
+  Todo el juego está en este único archivo (HTML + CSS + JavaScript).
+  Para encontrar lo que quieres cambiar, busca (Ctrl+F) estas marcas:
+
+   🔧 COLORES     → colores y fuentes de la página (en el CSS)
+   🔧 CONFIG      → tiempos, textos generales, link para compartir
+   🔧 OPCIONES    → poderes, debilidades, trajes, accesorios, guaridas
+   🔧 NOMBRES     → piezas del generador de nombres al azar
+   🔧 FRASES      → frases malvadas que salen en la carta
+   🔧 STATS       → estadísticas y niveles de amenaza
+   🔧 PASOS       → orden y textos de cada paso del juego
+   🔧 CARTA       → dibujo de la carta (posiciones, tamaños)
+   🔧 PERSONAJE   → dibujo del villano (capa, cara, ojos, boca…)
+   💡 IDEA        → cosas que se podrían agregar más adelante
+
+  Regla de oro: para AGREGAR una opción nueva (un poder, una debilidad,
+  etc.) basta con copiar una línea de la lista y cambiarle los datos.
+  No hay que tocar nada más: el juego la muestra sola.
+=====================================================================
+-->
+
+<!-- Fuentes: "Bangers" (títulos estilo cómic) y "Nunito" (texto).
+     🔧 COLORES: para cambiar de fuente, cambia el link y las variables
+     --fuente-titulo / --fuente-texto más abajo. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:ital,wght@0,600;0,800;0,900;1,700&display=swap" rel="stylesheet">
+
+<style>
+  /* =================================================================
+     🔧 COLORES de la página
+     Cambia estos valores y toda la página cambia de color.
+     (Los colores de la CARTA dependen del traje elegido: ver 🔧 OPCIONES)
+     ================================================================= */
+  :root {
+    --fondo: #12061f;          /* color de fondo principal */
+    --fondo-2: #2b0b45;        /* segundo color del degradado de fondo */
+    --panel: rgba(255, 255, 255, 0.06);   /* fondo de las cajas */
+    --borde: rgba(255, 255, 255, 0.14);   /* bordes de las cajas */
+    --texto: #f6ecff;          /* texto principal */
+    --texto-suave: #bda9d6;    /* texto secundario */
+    --acento: #ff3b8d;         /* color de botones principales y selección */
+    --acento-2: #8a5cff;       /* segundo color de acento */
+    --ok: #3dffa8;             /* color de "listo" */
+    --radio: 18px;             /* qué tan redondeadas son las esquinas */
+    --fuente-titulo: "Bangers", "Impact", sans-serif;
+    --fuente-texto: "Nunito", system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    color: var(--texto);
+    font-family: var(--fuente-texto);
+    background: radial-gradient(circle at 20% 0%, var(--fondo-2), var(--fondo) 60%) fixed;
+    background-color: var(--fondo);
+  }
+
+  .app {
+    max-width: 1040px;
+    margin: 0 auto;
+    padding: 20px 16px 40px;
+  }
+
+  /* ---------- Encabezado ---------- */
+  header { text-align: center; margin-bottom: 18px; }
+  header h1 {
+    font-family: var(--fuente-titulo);
+    font-weight: 400;
+    font-size: clamp(2.4rem, 7vw, 4rem);
+    letter-spacing: 2px;
+    margin: 0;
+    color: #fff;
+    text-shadow: 3px 3px 0 var(--acento), 6px 6px 0 var(--acento-2);
+  }
+  header p { margin: 6px 0 0; color: var(--texto-suave); font-weight: 700; }
+
+  /* ---------- Distribución: panel a la izquierda, carta a la derecha ---------- */
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 22px;
+    align-items: start;
+  }
+  .carta-wrap {
+    position: sticky;
+    top: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  #carta {
+    width: 100%;
+    height: auto;
+    border-radius: 22px;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+  }
+
+  /* En celular: la carta va arriba y más chica */
+  @media (max-width: 780px) {
+    .layout { grid-template-columns: 1fr; }
+    .carta-wrap { position: static; order: -1; }
+    #carta { width: min(100%, 300px); }
+  }
+
+  /* ---------- Panel de pasos ---------- */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--borde);
+    border-radius: var(--radio);
+    padding: 20px;
+    backdrop-filter: blur(6px);
+  }
+
+  .progreso { display: flex; gap: 6px; margin-bottom: 14px; }
+  .progreso span {
+    flex: 1;
+    height: 8px;
+    border-radius: 99px;
+    background: rgba(255, 255, 255, 0.12);
+    transition: background 0.3s;
+  }
+  .progreso span.hecho { background: var(--acento); }
+  .progreso span.actual { background: var(--acento-2); }
+
+  .paso-num { color: var(--texto-suave); font-weight: 800; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; }
+  .panel h2 {
+    font-family: var(--fuente-titulo);
+    font-weight: 400;
+    font-size: 2.1rem;
+    letter-spacing: 1px;
+    margin: 4px 0 2px;
+  }
+  .panel .sub { margin: 0 0 16px; color: var(--texto-suave); }
+
+  /* ---------- Botones de opciones ---------- */
+  .opciones {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+    gap: 10px;
+  }
+  .opcion {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 4px;
+    padding: 14px 10px;
+    border-radius: 14px;
+    border: 2px solid var(--borde);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--texto);
+    font: inherit;
+    cursor: pointer;
+    transition: transform 0.12s, border-color 0.2s, background 0.2s, box-shadow 0.2s;
+  }
+  .opcion:hover { transform: translateY(-3px) rotate(-1deg); border-color: var(--acento-2); }
+  .opcion[aria-pressed="true"] {
+    border-color: var(--acento);
+    background: rgba(255, 59, 141, 0.16);
+    box-shadow: 0 0 0 3px rgba(255, 59, 141, 0.25), 0 0 24px rgba(255, 59, 141, 0.35);
+  }
+  .opcion .emo { font-size: 2.2rem; line-height: 1.1; }
+  .opcion .nom { font-weight: 900; }
+  .opcion .desc { font-size: 0.82rem; color: var(--texto-suave); }
+
+  /* Muestra de color para los trajes */
+  .muestra { width: 46px; height: 30px; border-radius: 10px; border: 2px solid rgba(255,255,255,.4); }
+
+  /* ---------- Campo de nombre ---------- */
+  .campo-nombre { display: flex; gap: 10px; flex-wrap: wrap; }
+  .campo-nombre input {
+    flex: 1 1 220px;
+    min-width: 0;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 2px solid var(--borde);
+    background: rgba(0, 0, 0, 0.25);
+    color: var(--texto);
+    font: 800 1.2rem var(--fuente-texto);
+  }
+  .campo-nombre input:focus { outline: none; border-color: var(--acento); }
+
+  /* ---------- Botones generales ---------- */
+  .acciones { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; justify-content: space-between; }
+  .acciones.inicio { justify-content: flex-start; }
+  .acciones .der { display: flex; gap: 10px; flex-wrap: wrap; margin-left: auto; }
+  .btn {
+    padding: 12px 18px;
+    border-radius: 999px;
+    border: 2px solid var(--borde);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--texto);
+    font: 900 1rem var(--fuente-texto);
+    cursor: pointer;
+    transition: transform 0.12s, filter 0.2s;
+  }
+  .btn:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.15); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn.principal { background: var(--acento); border-color: var(--acento); color: #fff; }
+  .btn.secundario { background: var(--acento-2); border-color: var(--acento-2); color: #fff; }
+  .btn.grande { font-size: 1.15rem; padding: 14px 24px; }
+
+  .azar-total { text-align: center; margin-bottom: 16px; }
+
+  /* ---------- Pantalla de "creando villano..." ---------- */
+  .suspenso { text-align: center; padding: 40px 10px; }
+  .suspenso .emo { font-size: 4rem; display: inline-block; animation: girar 0.8s linear infinite; }
+  .suspenso p { font-family: var(--fuente-titulo); font-size: 2rem; letter-spacing: 1px; margin: 12px 0 0; }
+  @keyframes girar { to { transform: rotate(360deg); } }
+
+  /* La carta tiembla mientras se "crea" el villano */
+  .temblar { animation: temblar 0.12s infinite; }
+  @keyframes temblar {
+    0% { transform: translate(0, 0) rotate(0); }
+    25% { transform: translate(-3px, 2px) rotate(-1deg); }
+    50% { transform: translate(3px, -2px) rotate(1deg); }
+    75% { transform: translate(-2px, -3px) rotate(0); }
+  }
+  /* Pequeño salto cuando aparece el resultado */
+  .aparecer { animation: aparecer 0.5s cubic-bezier(.2, 1.6, .4, 1); }
+  @keyframes aparecer { from { transform: scale(0.85); } to { transform: scale(1); } }
+
+  /* ---------- Resultado ---------- */
+  .amenaza {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px;
+    border-radius: 999px;
+    color: #1a0b2e;
+    font: 400 1.6rem var(--fuente-titulo);
+    letter-spacing: 1px;
+  }
+  .contador { color: var(--texto-suave); font-size: 0.9rem; margin-top: 14px; }
+
+  /* ---------- Aviso flotante (toast) ---------- */
+  .aviso {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translate(-50%, 140%);
+    background: #fff;
+    color: #1a0b2e;
+    padding: 12px 20px;
+    border-radius: 999px;
+    font-weight: 900;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    transition: transform 0.3s, opacity 0.3s;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 10;
+    max-width: calc(100% - 32px);
+    text-align: center;
+  }
+  .aviso.visible { transform: translate(-50%, 0); opacity: 1; }
+
+  /* Respeta a quien prefiere menos animaciones */
+  @media (prefers-reduced-motion: reduce) {
+    .temblar, .aparecer, .suspenso .emo { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <!-- 🔧 TEXTOS: título y subtítulo de la página -->
+    <h1>😈 Crea tu Villano</h1>
+    <p>Elige poderes, debilidades y estilo… y descubre qué tan peligroso es.</p>
+  </header>
+
+  <div class="layout">
+    <section class="panel" id="panel" aria-live="polite"></section>
+
+    <div class="carta-wrap">
+      <!-- La carta se dibuja en este canvas (ver 🔧 CARTA en el código) -->
+      <canvas id="carta" width="600" height="960" role="img" aria-label="Carta de tu villano"></canvas>
+    </div>
+  </div>
+</div>
+
+<div class="aviso" id="aviso" role="status"></div>
+
+<script>
+/* =====================================================================
+   🔧 CONFIG — ajustes generales del juego
+   ===================================================================== */
+const CONFIG = {
+  // Texto pequeño que aparece al pie de la carta (tu marca)
+  MARCA: 'noparess · Crea tu villano',
+  // Link que se comparte junto con el villano
+  URL_COMPARTIR: 'https://wafflefun.github.io/noparess/',
+
+  // ⏱️ TIEMPOS (en milisegundos: 1000 = 1 segundo)
+  AUTO_AVANZAR: true,          // true = al elegir una opción pasa solo al siguiente paso
+  TIEMPO_AUTO_AVANZAR: 380,    // cuánto espera antes de pasar al siguiente paso
+  TIEMPO_SUSPENSO: 1500,       // cuánto dura el "Creando villano…" (la carta tiembla)
+  TIEMPO_REVELAR: 1300,        // cuánto tardan en llenarse las barras de estadísticas
+  TIEMPO_AVISO: 2400,          // cuánto se ve el aviso de abajo ("¡Copiado!", etc.)
+
+  // 📊 Estadísticas (ver también 🔧 STATS más abajo)
+  STAT_BASE: 30,               // con cuántos puntos parte cada estadística
+  STAT_AZAR: 12,               // cuánto azar se suma o resta (+/-) a cada estadística
+  STAT_MIN: 3,                 // valor mínimo posible
+  STAT_MAX: 99,                // valor máximo posible
+
+  // Nombre de la "memoria" del navegador para el contador de villanos
+  CLAVE_GUARDADO: 'creaTuVillano.contador',
+};
+
+/* =====================================================================
+   🔧 OPCIONES — todo lo que el jugador puede elegir
+   ---------------------------------------------------------------------
+   Para AGREGAR una opción: copia una línea completa { ... }, pégala
+   debajo y cambia los datos. El "id" debe ser único dentro de su lista.
+   "stats" suma (o resta, con números negativos) puntos a:
+      maldad, caos, poder, ridiculez
+   ===================================================================== */
+
+// ⚡ PODERES — "aura" es el color del brillo detrás del villano y de sus ojos
+const PODERES = [
+  { id: 'fuego',   emoji: '🔥', nombre: 'Fuego',              desc: 'Derrite todo… hasta su almuerzo', aura: '#ff6a00', stats: { poder: 30, caos: 20, maldad: 10 } },
+  { id: 'hielo',   emoji: '🧊', nombre: 'Hielo',              desc: 'Congela ciudades y helados',      aura: '#7fdcff', stats: { poder: 25, maldad: 15 } },
+  { id: 'mente',   emoji: '🧠', nombre: 'Control mental',     desc: 'Funciona sólo con palomas',       aura: '#ff7adf', stats: { maldad: 30, poder: 15, ridiculez: 15 } },
+  { id: 'rayos',   emoji: '⚡', nombre: 'Rayos',              desc: 'Cargador humano de celulares',    aura: '#ffe14d', stats: { poder: 35, caos: 15 } },
+  { id: 'portal',  emoji: '🌀', nombre: 'Portales',           desc: 'Aparece donde menos lo esperas',  aura: '#8a7dff', stats: { caos: 35, poder: 20 } },
+  { id: 'abejas',  emoji: '🐝', nombre: 'Ejército de abejas', desc: 'Bzzz. Mucho bzzz.',               aura: '#ffc400', stats: { caos: 30, maldad: 15, ridiculez: 10 } },
+  { id: 'sombras', emoji: '🌑', nombre: 'Sombras',            desc: 'Apaga la luz del planeta',        aura: '#6b5bff', stats: { maldad: 35, poder: 20 } },
+  { id: 'musica',  emoji: '🎺', nombre: 'Trompeta hipnótica', desc: 'Nadie resiste su solo',           aura: '#3dffa8', stats: { caos: 25, ridiculez: 25 } },
+  // 💡 IDEA: { id: 'chicle', emoji: '🫧', nombre: 'Chicle gigante', desc: 'Pega a todos al suelo', aura: '#ff9ad5', stats: { caos: 25, ridiculez: 20 } },
+];
+
+// 🥒 DEBILIDADES — mientras más absurda, más "ridiculez"
+const DEBILIDADES = [
+  { id: 'pepinos',    emoji: '🥒', nombre: 'Los pepinos',              desc: 'Grita como gato al verlos',     stats: { ridiculez: 30, poder: -5 } },
+  { id: 'gatitos',    emoji: '🐱', nombre: 'Los gatitos',              desc: 'Se detiene a acariciarlos',     stats: { ridiculez: 20, maldad: -10 } },
+  { id: 'wifi',       emoji: '📶', nombre: 'Quedarse sin wifi',        desc: 'Sin señal no hay plan malvado', stats: { ridiculez: 25, caos: -5 } },
+  { id: 'calcetines', emoji: '🧦', nombre: 'Los calcetines mojados',   desc: 'Pierde toda su maldad',         stats: { ridiculez: 25, maldad: -10 } },
+  { id: 'cumple',     emoji: '🎂', nombre: 'Que le canten cumpleaños', desc: 'Se emociona y llora',           stats: { ridiculez: 35 } },
+  { id: 'sueno',      emoji: '😴', nombre: 'Dormirse a las 9',         desc: 'Los planes son antes de las 9', stats: { ridiculez: 20, caos: -10 } },
+  { id: 'cosquillas', emoji: '🪶', nombre: 'Las cosquillas',           desc: 'Una pluma lo derrota',          stats: { ridiculez: 30, poder: -10 } },
+  { id: 'mama',       emoji: '📞', nombre: 'Las llamadas de su mamá',  desc: 'Siempre contesta. Siempre.',    stats: { ridiculez: 25, maldad: -5 } },
+];
+
+// 🎨 TRAJES — definen TODOS los colores de la carta y del villano:
+//   main  = color del traje        dark = fondo oscuro de la carta
+//   light = borde y detalles       cape = capa
+//   mask  = antifaz y cejas        skin = color de la cara
+const TRAJES = [
+  { id: 'morado', emoji: '🟣', nombre: 'Morado real',    main: '#6a2bd9', dark: '#1d0b3d', light: '#c9a6ff', cape: '#3a1078', mask: '#140726', skin: '#b6f0a0', stats: { maldad: 10 } },
+  { id: 'toxico', emoji: '🟢', nombre: 'Verde tóxico',   main: '#2fbf4a', dark: '#062612', light: '#b8ff6b', cape: '#14632a', mask: '#03140a', skin: '#e8d7ff', stats: { caos: 10 } },
+  { id: 'volcan', emoji: '🔴', nombre: 'Rojo volcán',    main: '#d62839', dark: '#2b0508', light: '#ffb199', cape: '#7a0f1c', mask: '#1a0204', skin: '#ffd6a8', stats: { poder: 10 } },
+  { id: 'abismo', emoji: '🔵', nombre: 'Azul abismo',    main: '#1f5fd1', dark: '#050f2b', light: '#8fd3ff', cape: '#0f2f73', mask: '#020818', skin: '#d4f4ff', stats: { maldad: 5, poder: 5 } },
+  { id: 'negro',  emoji: '⚫', nombre: 'Negro total',    main: '#2a2a33', dark: '#07070a', light: '#ff3b6b', cape: '#121218', mask: '#000000', skin: '#e6e6e6', stats: { maldad: 15 } },
+  { id: 'rosa',   emoji: '🩷', nombre: 'Rosa peligroso', main: '#ff4fa3', dark: '#3d0623', light: '#ffd1ea', cape: '#a3135c', mask: '#2a0418', skin: '#fff1c9', stats: { ridiculez: 10, caos: 5 } },
+  // 💡 IDEA: un traje dorado "Villano millonario" con main: '#d4a017'
+];
+
+// 👑 ACCESORIOS — se dibujan encima de la cabeza.
+//   Si "dibujar" es false, no se dibuja nada (opción "Nada").
+const ACCESORIOS = [
+  { id: 'corona',   emoji: '👑', nombre: 'Corona',          desc: 'Se autoproclamó rey',    stats: { maldad: 10 } },
+  { id: 'copa',     emoji: '🎩', nombre: 'Sombrero de copa', desc: 'Elegancia malvada',     stats: { maldad: 5, poder: 5 } },
+  { id: 'casco',    emoji: '🪖', nombre: 'Casco de guerra',  desc: 'Listo para la batalla', stats: { poder: 10 } },
+  { id: 'birrete',  emoji: '🎓', nombre: 'Birrete',          desc: 'Doctorado en maldad',   stats: { maldad: 5, caos: 5 } },
+  { id: 'antena',   emoji: '📡', nombre: 'Antena',           desc: 'Capta planes malvados', stats: { caos: 10 } },
+  { id: 'gallina',  emoji: '🐔', nombre: 'Gallina',          desc: 'Es su consejera',       stats: { ridiculez: 20 } },
+  { id: 'nada',     emoji: '🚫', nombre: 'Nada',             desc: 'Calvo y orgulloso',     stats: { ridiculez: 5 }, dibujar: false },
+];
+
+// 🏰 GUARIDAS — "titulo" es lo que aparece bajo el nombre en la carta
+const GUARIDAS = [
+  { id: 'volcan',    emoji: '🌋', nombre: 'Un volcán',              titulo: 'Señor del Volcán',          stats: { poder: 10 } },
+  { id: 'castillo',  emoji: '🏰', nombre: 'Un castillo embrujado',  titulo: 'Amo del Castillo Oscuro',   stats: { maldad: 10 } },
+  { id: 'submarina', emoji: '🌊', nombre: 'Una base submarina',     titulo: 'Terror de los Siete Mares', stats: { caos: 10 } },
+  { id: 'luna',      emoji: '🌙', nombre: 'La Luna',                titulo: 'Emperador Lunar',           stats: { poder: 15 } },
+  { id: 'mall',      emoji: '🏬', nombre: 'Un mall abandonado',     titulo: 'Rey del Patio de Comidas',  stats: { ridiculez: 15, caos: 5 } },
+  { id: 'banera',    emoji: '🛁', nombre: 'La bañera de su abuela', titulo: 'Tirano de la Bañera',       stats: { ridiculez: 25 } },
+];
+
+/* =====================================================================
+   🔧 NOMBRES — el nombre al azar se arma como:
+       PREFIJO + NÚCLEO + SUFIJO     (ej: "Barón Pepinillo Supremo")
+   Los '' vacíos en SUFIJOS hacen que a veces no tenga sufijo.
+   ===================================================================== */
+const PREFIJOS = ['Doctor', 'Lord', 'Capitán', 'Barón', 'Madame', 'Profesor', 'Conde', 'Lady', 'General', 'Gran'];
+const NUCLEOS  = ['Caos', 'Pepinillo', 'Sombra', 'Tornillo', 'Trueno', 'Calcetín', 'Veneno', 'Bigote', 'Tostada', 'Ruina', 'Moco', 'Pánico'];
+const SUFIJOS  = ['Oscuro', 'del Mal', 'Supremo', 'Jr.', 'III', 'Malvadísimo', '', '', ''];
+
+/* =====================================================================
+   🔧 FRASES — frases malvadas al azar. Puedes usar estas "etiquetas"
+   y el juego las reemplaza con lo que eligió el jugador:
+     {poder}     → ej: "control mental"
+     {debilidad} → ej: "los pepinos"
+     {guarida}   → ej: "un volcán"
+     {nombre}    → nombre del villano
+   ===================================================================== */
+const FRASES = [
+  '¡Tiemblen, mortales! Con mi poder de {poder} conquistaré el mundo… desde {guarida}.',
+  'Nadie podrá detenerme. Bueno, {debilidad} sí, pero nadie más.',
+  'Mi plan es perfecto: primero {poder}, después… ya veré.',
+  '¡{guarida} será la capital de mi nuevo imperio!',
+  'No le teman a mi poder de {poder}. Témanle a mis chistes.',
+  'Soy {nombre} y he venido a arruinarles el lunes.',
+  'Si alguien menciona {debilidad}, el plan se cancela. Gracias.',
+  // 💡 IDEA: frases distintas según el nivel de amenaza (ver nivelAmenaza)
+];
+
+/* =====================================================================
+   🔧 STATS — las 4 estadísticas de la carta.
+   Si agregas una nueva aquí, también puedes sumarle puntos desde las
+   opciones (ej: stats: { suerte: 10 }). La carta tiene espacio para 4;
+   para más, ajusta el espaciado en dibujarStats().
+   ===================================================================== */
+const STATS = [
+  { clave: 'maldad',    nombre: 'Maldad',    emoji: '😈', color: '#ff4d6d' },
+  { clave: 'caos',      nombre: 'Caos',      emoji: '🌀', color: '#ffb020' },
+  { clave: 'poder',     nombre: 'Poder',     emoji: '⚡', color: '#4dc3ff' },
+  { clave: 'ridiculez', nombre: 'Ridiculez', emoji: '🤡', color: '#b8ff6b' },
+];
+
+// Niveles de amenaza: se elige el ÚLTIMO cuyo "min" sea menor o igual al
+// puntaje. El puntaje = promedio(maldad, caos, poder) − ridiculez / 4
+// (la fórmula está en calcularPuntaje(), por si quieres cambiarla).
+const NIVELES_AMENAZA = [
+  { min: -999, nombre: 'Molestia leve',      emoji: '🙄', color: '#9be15d', desc: 'Más que villano, es un vecino molesto.' },
+  { min: 22,   nombre: 'Problema de barrio', emoji: '😬', color: '#ffd43b', desc: 'Asusta a las palomas y roba wifi.' },
+  { min: 34,   nombre: 'Amenaza nacional',   emoji: '🚨', color: '#ff922b', desc: 'Ya sale en las noticias de la noche.' },
+  { min: 46,   nombre: 'Peligro planetario', emoji: '🌍', color: '#ff5c5c', desc: 'Los superhéroes están nerviosos.' },
+  { min: 58,   nombre: 'Fin del universo',   emoji: '☄️', color: '#e07bff', desc: 'Que alguien llame a TODOS los héroes.' },
+];
+
+/* =====================================================================
+   🔧 PASOS — el orden en que se pregunta cada cosa.
+   Puedes cambiar el orden moviendo las líneas, o cambiar los textos.
+   "clave" debe coincidir con una propiedad del villano (no cambiarla).
+   ===================================================================== */
+const PASOS = [
+  { clave: 'nombre',    titulo: '¿Cómo se llama?',        sub: 'Escribe un nombre o deja que el destino decida.', tipo: 'nombre' },
+  { clave: 'poder',     titulo: 'Elige su superpoder',    sub: 'Todo villano necesita algo con qué amenazar.',   opciones: PODERES },
+  { clave: 'debilidad', titulo: 'Su debilidad secreta',   sub: 'Nadie es perfecto. Ni siquiera el mal.',         opciones: DEBILIDADES },
+  { clave: 'traje',     titulo: 'Elige su traje',         sub: 'El color dice mucho de un villano.',             opciones: TRAJES, tipo: 'color' },
+  { clave: 'accesorio', titulo: '¿Qué lleva en la cabeza?', sub: 'El toque final de su look.',                   opciones: ACCESORIOS },
+  { clave: 'guarida',   titulo: '¿Dónde vive?',           sub: 'Toda maldad necesita una base.',                 opciones: GUARIDAS },
+  // 💡 IDEA: un paso "Archienemigo" (un héroe ridículo) que aparezca en la carta
+  // 💡 IDEA: un paso "Mascota malvada" (🐍 🦈 🐈‍⬛) dibujada junto al villano
+];
+
+
+/* =====================================================================
+   De aquí para abajo está la "maquinaria" del juego.
+   Normalmente no hace falta tocarla, pero también tiene notas.
+   ===================================================================== */
+
+// Estado actual del villano que se está creando
+let villano = villanoVacio();
+let pasoActual = 0;
+let animando = false;
+
+function villanoVacio() {
+  return { nombre: '', poder: null, debilidad: null, traje: null, accesorio: null, guarida: null, stats: null, amenaza: null, frase: null };
+}
+
+// ---------- Utilidades de azar ----------
+const azar = (lista) => lista[Math.floor(Math.random() * lista.length)];
+const entre = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+function nombreAlAzar() {
+  const sufijo = azar(SUFIJOS);
+  return `${azar(PREFIJOS)} ${azar(NUCLEOS)}${sufijo ? ' ' + sufijo : ''}`;
+}
+
+// Pone mayúscula a la primera letra (aunque empiece con ¡ o ¿)
+function capitalizar(texto) {
+  return texto.replace(/^([¡¿"“]*)(\p{L})/u, (_, signos, letra) => signos + letra.toUpperCase());
+}
+// Pasa la primera letra a minúscula, para usar dentro de una frase ("Los pepinos" → "los pepinos")
+const minus = (texto) => texto.charAt(0).toLowerCase() + texto.slice(1);
+
+function fraseAlAzar(v) {
+  const frase = azar(FRASES)
+    .replaceAll('{poder}', minus(v.poder.nombre))
+    .replaceAll('{debilidad}', minus(v.debilidad.nombre))
+    .replaceAll('{guarida}', minus(v.guarida.nombre))
+    .replaceAll('{nombre}', v.nombre);
+  return capitalizar(frase);
+}
+
+// ---------- 🔧 STATS: cálculo ----------
+function calcularStats(v) {
+  const stats = {};
+  STATS.forEach((s) => { stats[s.clave] = CONFIG.STAT_BASE; });
+  // Suma los puntos de cada opción elegida
+  [v.poder, v.debilidad, v.traje, v.accesorio, v.guarida].forEach((opcion) => {
+    if (!opcion || !opcion.stats) return;
+    for (const clave in opcion.stats) {
+      stats[clave] = (stats[clave] ?? CONFIG.STAT_BASE) + opcion.stats[clave];
+    }
+  });
+  // Agrega un poco de azar para que dos villanos iguales no salgan idénticos
+  for (const clave in stats) {
+    const valor = stats[clave] + entre(-CONFIG.STAT_AZAR, CONFIG.STAT_AZAR);
+    stats[clave] = Math.max(CONFIG.STAT_MIN, Math.min(CONFIG.STAT_MAX, valor));
+  }
+  return stats;
+}
+
+function calcularPuntaje(stats) {
+  return (stats.maldad + stats.caos + stats.poder) / 3 - stats.ridiculez / 4;
+}
+
+function nivelAmenaza(stats) {
+  const puntaje = calcularPuntaje(stats);
+  let nivel = NIVELES_AMENAZA[0];
+  NIVELES_AMENAZA.forEach((n) => { if (puntaje >= n.min) nivel = n; });
+  return nivel;
+}
+
+// ---------- Contador guardado en el navegador ----------
+function leerContador() {
+  try { return parseInt(localStorage.getItem(CONFIG.CLAVE_GUARDADO), 10) || 0; } catch { return 0; }
+}
+function sumarContador() {
+  const n = leerContador() + 1;
+  try { localStorage.setItem(CONFIG.CLAVE_GUARDADO, String(n)); } catch { /* sin memoria: no pasa nada */ }
+  return n;
+}
+// 💡 IDEA: guardar los últimos 6 villanos y mostrarlos en una "Galería del mal"
+
+
+/* =====================================================================
+   PANEL DE PASOS (la parte izquierda)
+   ===================================================================== */
+const panel = document.getElementById('panel');
+
+function mostrarPaso(indice) {
+  pasoActual = indice;
+  const paso = PASOS[indice];
+  const esUltimo = indice === PASOS.length - 1;
+  const elegido = villano[paso.clave];
+
+  // Barra de progreso
+  const barras = PASOS.map((_, i) =>
+    `<span class="${i < indice ? 'hecho' : i === indice ? 'actual' : ''}"></span>`).join('');
+
+  let contenido;
+  if (paso.tipo === 'nombre') {
+    contenido = `
+      <div class="campo-nombre">
+        <input id="inputNombre" type="text" maxlength="26" autocomplete="off"
+               placeholder="Ej: Doctor Calcetín" aria-label="Nombre del villano">
+        <button class="btn secundario" id="btnNombreAzar" type="button">🎲 Nombre al azar</button>
+      </div>`;
+  } else {
+    contenido = `<div class="opciones">${paso.opciones.map((op) => `
+      <button class="opcion" type="button" data-id="${op.id}" aria-pressed="${elegido && elegido.id === op.id}">
+        ${paso.tipo === 'color'
+          ? `<span class="muestra" style="background: linear-gradient(135deg, ${op.main}, ${op.cape})"></span>`
+          : `<span class="emo" aria-hidden="true">${op.emoji}</span>`}
+        <span class="nom">${op.nombre}</span>
+        ${op.desc ? `<span class="desc">${op.desc}</span>` : ''}
+      </button>`).join('')}</div>`;
+  }
+
+  panel.innerHTML = `
+    ${indice === 0 ? `<div class="azar-total"><button class="btn principal grande" id="btnTodoAzar" type="button">🎲 Villano 100% al azar</button></div>` : ''}
+    <div class="progreso" aria-hidden="true">${barras}</div>
+    <div class="paso-num">Paso ${indice + 1} de ${PASOS.length}</div>
+    <h2>${paso.titulo}</h2>
+    <p class="sub">${paso.sub}</p>
+    ${contenido}
+    <div class="acciones">
+      ${indice > 0 ? '<button class="btn" id="btnAtras" type="button">← Atrás</button>' : ''}
+      <div class="der">
+        ${paso.tipo !== 'nombre' ? '<button class="btn" id="btnPasoAzar" type="button">🎲 Al azar</button>' : ''}
+        <button class="btn ${esUltimo ? 'principal grande' : 'secundario'}" id="btnSiguiente" type="button">
+          ${esUltimo ? '😈 ¡Crear villano!' : 'Siguiente →'}
+        </button>
+      </div>
+    </div>`;
+
+  // --- Eventos ---
+  const btnSiguiente = document.getElementById('btnSiguiente');
+  // En los pasos con opciones, no se puede avanzar sin elegir (el nombre sí puede ir vacío)
+  btnSiguiente.disabled = paso.tipo !== 'nombre' && !elegido;
+  btnSiguiente.onclick = avanzar;
+
+  const btnAtras = document.getElementById('btnAtras');
+  if (btnAtras) btnAtras.onclick = () => mostrarPaso(pasoActual - 1);
+
+  const btnTodoAzar = document.getElementById('btnTodoAzar');
+  if (btnTodoAzar) btnTodoAzar.onclick = villanoAlAzar;
+
+  if (paso.tipo === 'nombre') {
+    const input = document.getElementById('inputNombre');
+    input.value = villano.nombre;
+    input.oninput = () => { villano.nombre = input.value; dibujarCarta(villano, null); };
+    input.onkeydown = (e) => { if (e.key === 'Enter') avanzar(); };
+    document.getElementById('btnNombreAzar').onclick = () => {
+      villano.nombre = nombreAlAzar();
+      input.value = villano.nombre;
+      dibujarCarta(villano, null);
+    };
+  } else {
+    panel.querySelectorAll('.opcion').forEach((boton) => {
+      boton.onclick = () => elegir(paso, paso.opciones.find((o) => o.id === boton.dataset.id));
+    });
+    document.getElementById('btnPasoAzar').onclick = () => elegir(paso, azar(paso.opciones));
+  }
+}
+
+let temporizadorAvance = null;
+function elegir(paso, opcion) {
+  villano[paso.clave] = opcion;
+  panel.querySelectorAll('.opcion').forEach((b) =>
+    b.setAttribute('aria-pressed', String(b.dataset.id === opcion.id)));
+  document.getElementById('btnSiguiente').disabled = false;
+  dibujarCarta(villano, null);
+
+  // Pasa solo al siguiente paso (se puede apagar en CONFIG.AUTO_AVANZAR)
+  clearTimeout(temporizadorAvance);
+  if (CONFIG.AUTO_AVANZAR && pasoActual < PASOS.length - 1) {
+    const pasoDeEstaEleccion = pasoActual;
+    temporizadorAvance = setTimeout(() => {
+      if (pasoActual === pasoDeEstaEleccion) avanzar();
+    }, CONFIG.TIEMPO_AUTO_AVANZAR);
+  }
+}
+
+function avanzar() {
+  clearTimeout(temporizadorAvance);
+  if (pasoActual < PASOS.length - 1) mostrarPaso(pasoActual + 1);
+  else crearVillano();
+}
+
+// Rellena todo lo que falte al azar y crea el villano de inmediato
+function villanoAlAzar() {
+  villano.nombre = nombreAlAzar();
+  PASOS.forEach((p) => { if (p.opciones) villano[p.clave] = azar(p.opciones); });
+  crearVillano();
+}
+
+
+/* =====================================================================
+   CREAR Y REVELAR EL VILLANO
+   ===================================================================== */
+function crearVillano() {
+  if (animando) return;
+  animando = true;
+  clearTimeout(temporizadorAvance);
+
+  if (!villano.nombre.trim()) villano.nombre = nombreAlAzar();
+  // Por si falta algo, se elige al azar
+  PASOS.forEach((p) => { if (p.opciones && !villano[p.clave]) villano[p.clave] = azar(p.opciones); });
+
+  villano.stats = calcularStats(villano);
+  villano.amenaza = nivelAmenaza(villano.stats);
+  villano.frase = fraseAlAzar(villano);
+  const total = sumarContador();
+
+  // 🔧 TEXTOS: mensajes que salen mientras se "crea" el villano
+  const mensajes = ['Mezclando maldad…', 'Cosiendo la capa…', 'Ensayando la risa malvada…', 'Calculando el caos…'];
+  panel.innerHTML = `<div class="suspenso"><span class="emo" aria-hidden="true">😈</span><p>${azar(mensajes)}</p></div>`;
+
+  const lienzo = document.getElementById('carta');
+  lienzo.classList.add('temblar');
+  dibujarCarta(villano, null);
+
+  setTimeout(() => {
+    lienzo.classList.remove('temblar');
+    lienzo.classList.add('aparecer');
+    // Animación de las barras de 0 a su valor
+    const inicio = performance.now();
+    function cuadro(ahora) {
+      const p = Math.min(1, (ahora - inicio) / CONFIG.TIEMPO_REVELAR);
+      dibujarCarta(villano, 1 - Math.pow(1 - p, 3)); // "ease-out": empieza rápido y frena
+      if (p < 1) requestAnimationFrame(cuadro);
+      else {
+        lienzo.classList.remove('aparecer');
+        animando = false;
+        mostrarResultado(total);
+      }
+    }
+    requestAnimationFrame(cuadro);
+  }, CONFIG.TIEMPO_SUSPENSO);
+  // 💡 IDEA: sonido de risa malvada aquí (new Audio('risa.mp3').play())
+}
+
+function mostrarResultado(total) {
+  const a = villano.amenaza;
+  panel.innerHTML = `
+    <div class="paso-num">Nivel de amenaza</div>
+    <h2><span class="amenaza" style="background:${a.color}">${a.emoji} ${a.nombre}</span></h2>
+    <p class="sub">${a.desc}</p>
+    <p><b>${villano.nombre}</b>, ${minus(villano.guarida.titulo)}, usa su poder de <b>${minus(villano.poder.nombre)}</b> para sembrar el caos…
+       pero no soporta <b>${minus(villano.debilidad.nombre)}</b> ${villano.debilidad.emoji}.</p>
+    <div class="acciones inicio">
+      <button class="btn principal grande" id="btnDescargar" type="button">⬇️ Descargar carta</button>
+      <button class="btn secundario grande" id="btnCompartir" type="button">📤 Compartir</button>
+    </div>
+    <div class="acciones inicio">
+      <button class="btn" id="btnEditar" type="button">✏️ Editar este villano</button>
+      <button class="btn" id="btnOtro" type="button">🔁 Crear otro</button>
+      <button class="btn" id="btnAzarOtra" type="button">🎲 Otro al azar</button>
+    </div>
+    <p class="contador">Villanos creados en este dispositivo: <b>${total}</b></p>`;
+
+  document.getElementById('btnDescargar').onclick = descargarCarta;
+  document.getElementById('btnCompartir').onclick = compartir;
+  document.getElementById('btnEditar').onclick = () => {
+    villano.stats = villano.amenaza = villano.frase = null;
+    dibujarCarta(villano, null);
+    mostrarPaso(0);
+  };
+  document.getElementById('btnOtro').onclick = () => {
+    villano = villanoVacio();
+    dibujarCarta(villano, null);
+    mostrarPaso(0);
+  };
+  document.getElementById('btnAzarOtra').onclick = () => { villano = villanoVacio(); villanoAlAzar(); };
+
+  // Texto para lectores de pantalla
+  document.getElementById('carta').setAttribute('aria-label',
+    `Carta de ${villano.nombre}: ${a.nombre}. ` +
+    STATS.map((s) => `${s.nombre} ${villano.stats[s.clave]}`).join(', ') + `. Frase: ${villano.frase}`);
+}
+
+
+/* =====================================================================
+   DESCARGAR Y COMPARTIR
+   ===================================================================== */
+function nombreArchivo() {
+  const limpio = villano.nombre.normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  return `villano-${limpio || 'sin-nombre'}.png`;
+}
+
+function descargarCarta() {
+  const enlace = document.createElement('a');
+  enlace.download = nombreArchivo();
+  enlace.href = document.getElementById('carta').toDataURL('image/png');
+  enlace.click();
+  avisar('¡Carta descargada! 😈');
+}
+
+// 🔧 TEXTOS: el mensaje que se comparte
+function textoCompartir() {
+  return `Mi villano es ${villano.nombre} ${villano.amenaza.emoji} (${villano.amenaza.nombre}). ¿Puedes crear uno más peligroso?`;
+}
+
+async function compartir() {
+  const texto = textoCompartir();
+  const lienzo = document.getElementById('carta');
+  try {
+    // 1) En celulares: compartir la imagen directo (WhatsApp, Instagram, etc.)
+    const blob = await new Promise((ok) => lienzo.toBlob(ok, 'image/png'));
+    const archivo = new File([blob], nombreArchivo(), { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [archivo] })) {
+      await navigator.share({ files: [archivo], title: 'Crea tu Villano', text: `${texto} ${CONFIG.URL_COMPARTIR}` });
+      return;
+    }
+    // 2) Si no se puede la imagen, compartir sólo el texto y el link
+    if (navigator.share) {
+      await navigator.share({ title: 'Crea tu Villano', text: texto, url: CONFIG.URL_COMPARTIR });
+      return;
+    }
+    // 3) En computador: copiar el texto
+    await navigator.clipboard.writeText(`${texto} ${CONFIG.URL_COMPARTIR}`);
+    avisar('¡Texto copiado! Pégalo donde quieras 📋');
+  } catch (error) {
+    if (error && error.name === 'AbortError') return; // el usuario cerró el menú de compartir
+    avisar('No se pudo compartir. Prueba con "Descargar carta".');
+  }
+}
+
+let temporizadorAviso = null;
+function avisar(texto) {
+  const aviso = document.getElementById('aviso');
+  aviso.textContent = texto;
+  aviso.classList.add('visible');
+  clearTimeout(temporizadorAviso);
+  temporizadorAviso = setTimeout(() => aviso.classList.remove('visible'), CONFIG.TIEMPO_AVISO);
+}
+
+
+/* =====================================================================
+   🔧 CARTA — dibujo de la carta en el canvas
+   ---------------------------------------------------------------------
+   La carta mide 600 x 960 píxeles. Todas las posiciones (x, y) están
+   pensadas para ese tamaño: x va de izquierda (0) a derecha (600),
+   y va de arriba (0) a abajo (960).
+
+   Orden de arriba hacia abajo:
+     30–126  nombre        |  160  título (según guarida)
+     170–510 villano        |  520  nivel de amenaza
+     590–680 frase          |  715  estadísticas (4 filas)
+     895     debilidad      |  935  marca
+   ===================================================================== */
+const ctx = document.getElementById('carta').getContext('2d');
+const ANCHO = 600, ALTO = 960;
+const FUENTE_EMOJI = '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+// Colores que se usan mientras todavía no se elige traje
+const TRAJE_VACIO = { main: '#55506b', dark: '#15131f', light: '#a9a3c4', cape: '#34304a', mask: '#1b1828', skin: '#c9c4dd' };
+
+// progreso: null = todavía no se crea el villano (stats con "?")
+//           0 a 1 = animación de las barras (1 = completas)
+function dibujarCarta(v, progreso) {
+  const t = v.traje || TRAJE_VACIO;
+  ctx.clearRect(0, 0, ANCHO, ALTO);
+
+  // Fondo con degradado según el traje
+  const fondo = ctx.createRadialGradient(ANCHO / 2, 320, 40, ANCHO / 2, 320, 640);
+  fondo.addColorStop(0, t.main);
+  fondo.addColorStop(1, t.dark);
+  ctx.fillStyle = fondo;
+  rectRedondo(0, 0, ANCHO, ALTO, 36);
+  ctx.fill();
+
+  // Rayos de cómic detrás del villano
+  ctx.save();
+  ctx.globalAlpha = 0.08;
+  ctx.fillStyle = '#ffffff';
+  for (let i = 0; i < 16; i++) {          // 🔧 cantidad de rayos
+    const a1 = (i / 16) * Math.PI * 2, a2 = a1 + Math.PI / 32;
+    ctx.beginPath();
+    ctx.moveTo(ANCHO / 2, 340);
+    ctx.lineTo(ANCHO / 2 + Math.cos(a1) * 700, 340 + Math.sin(a1) * 700);
+    ctx.lineTo(ANCHO / 2 + Math.cos(a2) * 700, 340 + Math.sin(a2) * 700);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // Guarida gigante y transparente de fondo
+  if (v.guarida) {
+    ctx.save();
+    ctx.globalAlpha = 0.22;                // 🔧 transparencia de la guarida
+    emoji(v.guarida.emoji, 470, 420, 210);
+    ctx.restore();
+  }
+
+  // Borde de la carta
+  ctx.lineWidth = 10;
+  ctx.strokeStyle = t.light;
+  rectRedondo(10, 10, ANCHO - 20, ALTO - 20, 30);
+  ctx.stroke();
+
+  // Nombre
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+  rectRedondo(30, 30, ANCHO - 60, 96, 22);
+  ctx.fill();
+  const nombre = (v.nombre || '').trim() || '¿¿¿ ??? ???';
+  texto(nombre.toUpperCase(), ANCHO / 2, 80, { fuente: 'Bangers', tam: 62, max: ANCHO - 100, color: '#ffffff', sombra: t.main });
+
+  // Título bajo el nombre
+  texto(v.guarida ? v.guarida.titulo : 'Villano en construcción…', ANCHO / 2, 160,
+    { fuente: 'Nunito', peso: 900, tam: 26, max: ANCHO - 80, color: t.light });
+
+  // El villano
+  dibujarPersonaje(v, t, ANCHO / 2, 300);
+
+  // Nivel de amenaza (sólo cuando terminó la animación)
+  const revelado = progreso !== null && progreso >= 1;
+  ctx.fillStyle = revelado ? v.amenaza.color : 'rgba(255, 255, 255, 0.12)';
+  rectRedondo(ANCHO / 2 - 210, 520, 420, 52, 26);
+  ctx.fill();
+  texto(revelado ? `${v.amenaza.emoji} ${v.amenaza.nombre.toUpperCase()}` : 'AMENAZA: ???',
+    ANCHO / 2, 547, { fuente: 'Bangers', tam: 32, max: 390, color: revelado ? '#1a0b2e' : '#ffffff' });
+
+  // Frase malvada
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+  rectRedondo(40, 586, ANCHO - 80, 100, 18);
+  ctx.fill();
+  if (v.frase) {
+    textoEnLineas(`“${v.frase}”`, ANCHO / 2, 636, ANCHO - 120, 28, 3,
+      { fuente: 'Nunito', peso: 700, estilo: 'italic', tam: 22, color: '#ffffff' });
+  } else {
+    texto('Su frase malvada aparecerá al final…', ANCHO / 2, 636,
+      { fuente: 'Nunito', peso: 700, estilo: 'italic', tam: 20, color: 'rgba(255,255,255,0.55)' });
+  }
+
+  dibujarStats(v, progreso);
+
+  // Debilidad
+  texto(v.debilidad ? `Debilidad: ${v.debilidad.emoji} ${v.debilidad.nombre}` : 'Debilidad: ???',
+    ANCHO / 2, 895, { fuente: 'Nunito', peso: 900, tam: 22, max: ANCHO - 80, color: t.light });
+
+  // Marca
+  texto(CONFIG.MARCA, ANCHO / 2, 935, { fuente: 'Nunito', peso: 800, tam: 15, color: 'rgba(255,255,255,0.5)' });
+  // 💡 IDEA: agregar un número de serie tipo "Villano #0042" usando el contador
+}
+
+function dibujarStats(v, progreso) {
+  const yInicio = 715, separacion = 42;   // 🔧 posición y espacio entre filas
+  const xBarra = 235, anchoBarra = 265, altoBarra = 20;
+  STATS.forEach((s, i) => {
+    const y = yInicio + i * separacion;
+    texto(`${s.emoji} ${s.nombre}`, 50, y, { fuente: 'Nunito', peso: 900, tam: 22, color: '#ffffff', alinear: 'left' });
+
+    // Fondo de la barra
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+    rectRedondo(xBarra, y - altoBarra / 2, anchoBarra, altoBarra, altoBarra / 2);
+    ctx.fill();
+
+    let valorTexto = '?';
+    if (progreso !== null && v.stats) {
+      const valor = v.stats[s.clave] * progreso;
+      ctx.fillStyle = s.color;
+      rectRedondo(xBarra, y - altoBarra / 2, Math.max(altoBarra, (anchoBarra * valor) / 100), altoBarra, altoBarra / 2);
+      ctx.fill();
+      valorTexto = String(Math.round(valor));
+    }
+    texto(valorTexto, 550, y, { fuente: 'Bangers', tam: 28, color: '#ffffff', alinear: 'right' });
+  });
+}
+
+
+/* =====================================================================
+   🔧 PERSONAJE — dibujo del villano
+   (cx, cy) es el centro de la cabeza. Todo se dibuja relativo a ese
+   punto, así que para mover al villano completo basta con cambiar
+   el "300" en dibujarPersonaje(v, t, ANCHO / 2, 300) de dibujarCarta().
+   ===================================================================== */
+function dibujarPersonaje(v, t, cx, cy) {
+  // Aura de poder (brillo detrás)
+  if (v.poder) {
+    const aura = ctx.createRadialGradient(cx, cy + 60, 10, cx, cy + 60, 230);
+    aura.addColorStop(0, v.poder.aura + 'cc');
+    aura.addColorStop(1, v.poder.aura + '00');
+    ctx.fillStyle = aura;
+    ctx.fillRect(cx - 240, cy - 180, 480, 420);
+  }
+
+  // Capa
+  ctx.fillStyle = t.cape;
+  ctx.beginPath();
+  ctx.moveTo(cx - 70, cy + 70);
+  ctx.quadraticCurveTo(cx - 175, cy + 165, cx - 150, cy + 205);
+  ctx.lineTo(cx + 150, cy + 205);
+  ctx.quadraticCurveTo(cx + 175, cy + 165, cx + 70, cy + 70);
+  ctx.closePath();
+  ctx.fill();
+
+  // Cuello alto de la capa (las dos puntas detrás de la cabeza)
+  for (const lado of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(cx + lado * 40, cy + 75);
+    ctx.lineTo(cx + lado * 112, cy - 20);
+    ctx.lineTo(cx + lado * 82, cy + 75);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Cuerpo
+  ctx.fillStyle = t.main;
+  ctx.strokeStyle = t.dark;
+  ctx.lineWidth = 4;
+  rectRedondo(cx - 72, cy + 60, 144, 145, 40);
+  ctx.fill();
+  ctx.stroke();
+
+  // Cinturón y hebilla
+  ctx.fillStyle = t.dark;
+  ctx.fillRect(cx - 70, cy + 160, 140, 14);
+  ctx.fillStyle = t.light;
+  ctx.fillRect(cx - 12, cy + 157, 24, 20);
+
+  // Emblema en el pecho (con el emoji del poder)
+  ctx.beginPath();
+  ctx.arc(cx, cy + 110, 30, 0, Math.PI * 2);
+  ctx.fillStyle = t.light;
+  ctx.fill();
+  ctx.stroke();
+  emoji(v.poder ? v.poder.emoji : '❓', cx, cy + 112, 34);
+
+  // Poder en las manos (a los lados)
+  if (v.poder) {
+    emoji(v.poder.emoji, cx - 128, cy + 130, 46);
+    emoji(v.poder.emoji, cx + 128, cy + 130, 46);
+  }
+
+  // Cabeza
+  ctx.beginPath();
+  ctx.arc(cx, cy, 64, 0, Math.PI * 2);
+  ctx.fillStyle = t.skin;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+  ctx.stroke();
+
+  // Antifaz
+  ctx.fillStyle = t.mask;
+  rectRedondo(cx - 66, cy - 28, 132, 34, 16);
+  ctx.fill();
+
+  // Ojos enojados (inclinados hacia el centro)
+  for (const lado of [-1, 1]) {
+    ctx.save();
+    ctx.translate(cx + lado * 26, cy - 11);
+    ctx.rotate(-lado * 0.25);             // 🔧 inclinación de los ojos
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 17, 8, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(-lado * 4, 1, 5, 0, Math.PI * 2);
+    ctx.fillStyle = v.poder ? v.poder.aura : '#222222';  // pupilas del color del poder
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Cejas
+  ctx.strokeStyle = t.mask;
+  ctx.lineWidth = 9;
+  ctx.lineCap = 'round';
+  for (const lado of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(cx + lado * 50, cy - 44);
+    ctx.lineTo(cx + lado * 12, cy - 30);
+    ctx.stroke();
+  }
+
+  // Sonrisa malvada con colmillos
+  ctx.fillStyle = '#2a0a12';
+  ctx.beginPath();
+  ctx.moveTo(cx - 32, cy + 20);
+  ctx.quadraticCurveTo(cx, cy + 52, cx + 32, cy + 20);
+  ctx.quadraticCurveTo(cx, cy + 32, cx - 32, cy + 20);
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  for (const lado of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(cx + lado * 18, cy + 26);
+    ctx.lineTo(cx + lado * 12, cy + 38);
+    ctx.lineTo(cx + lado * 7, cy + 28);
+    ctx.fill();
+  }
+
+  // Accesorio en la cabeza
+  if (v.accesorio && v.accesorio.dibujar !== false) {
+    emoji(v.accesorio.emoji, cx, cy - 84, 84);  // 🔧 posición y tamaño del accesorio
+  }
+  // 💡 IDEA: distintas formas de cabeza o bocas según el poder elegido
+}
+
+
+/* =====================================================================
+   Ayudantes de dibujo (no hace falta tocarlos)
+   ===================================================================== */
+function rectRedondo(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function emoji(e, x, y, tam) {
+  ctx.font = `${tam}px ${FUENTE_EMOJI}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(e, x, y);
+}
+
+// Escribe texto; si no cabe en "max", achica la letra hasta que quepa
+function texto(str, x, y, o) {
+  let tam = o.tam;
+  const fuente = () => `${o.estilo || ''} ${o.peso || 400} ${tam}px "${o.fuente}", ${FUENTE_EMOJI}`;
+  ctx.font = fuente();
+  if (o.max) {
+    while (ctx.measureText(str).width > o.max && tam > 12) { tam -= 2; ctx.font = fuente(); }
+  }
+  ctx.textAlign = o.alinear || 'center';
+  ctx.textBaseline = 'middle';
+  if (o.sombra) {
+    ctx.fillStyle = o.sombra;
+    ctx.fillText(str, x + 4, y + 4);
+  }
+  ctx.fillStyle = o.color;
+  ctx.fillText(str, x, y);
+}
+
+// Escribe texto en varias líneas, centrado verticalmente en "yCentro"
+function textoEnLineas(str, x, yCentro, max, altoLinea, maxLineas, o) {
+  ctx.font = `${o.estilo || ''} ${o.peso || 400} ${o.tam}px "${o.fuente}", ${FUENTE_EMOJI}`;
+  const palabras = str.split(' ');
+  const lineas = [];
+  let linea = '';
+  for (const palabra of palabras) {
+    const prueba = linea ? `${linea} ${palabra}` : palabra;
+    if (ctx.measureText(prueba).width > max && linea) { lineas.push(linea); linea = palabra; }
+    else linea = prueba;
+  }
+  if (linea) lineas.push(linea);
+  const visibles = lineas.slice(0, maxLineas);
+  const yInicio = yCentro - ((visibles.length - 1) * altoLinea) / 2;
+  visibles.forEach((l, i) => texto(l, x, yInicio + i * altoLinea, o));
+}
+
+
+/* =====================================================================
+   INICIO
+   ===================================================================== */
+mostrarPaso(0);
+dibujarCarta(villano, null);
+// Vuelve a dibujar la carta cuando terminan de cargar las fuentes
+if (document.fonts) {
+  Promise.all([
+    document.fonts.load('62px "Bangers"'),
+    document.fonts.load('900 22px "Nunito"'),
+    document.fonts.load('italic 700 22px "Nunito"'),
+  ]).then(() => dibujarCarta(villano, villano.stats ? 1 : null)).catch(() => {});
+}
+</script>
+</body>
+</html>
